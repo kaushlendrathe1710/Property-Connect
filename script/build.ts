@@ -62,9 +62,14 @@ async function buildAll() {
   });
 
   // Push database schema in production builds
-  if (process.env.DATABASE_URL) {
+  const databaseUrl = process.env.DATABASE_URL || process.env.NEON_DATABASE_URL;
+  if (databaseUrl) {
     console.log("pushing database schema...");
     try {
+      // Set DATABASE_URL for drizzle-kit if only NEON_DATABASE_URL is set
+      if (!process.env.DATABASE_URL && process.env.NEON_DATABASE_URL) {
+        process.env.DATABASE_URL = process.env.NEON_DATABASE_URL;
+      }
       execSync("npx drizzle-kit push", { stdio: "inherit" });
       console.log("database schema pushed successfully");
     } catch (err) {
@@ -72,7 +77,7 @@ async function buildAll() {
       // Don't fail the build if db push fails - it might already be up to date
     }
   } else {
-    console.log("DATABASE_URL not set, skipping database schema push");
+    console.log("DATABASE_URL/NEON_DATABASE_URL not set, skipping database schema push");
   }
 }
 
