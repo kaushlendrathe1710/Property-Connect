@@ -1,134 +1,223 @@
 import { useState } from "react";
-import { Link, useLocation } from "wouter";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { loginSchema, type LoginFormData } from "@shared/schema";
+import { useLocation } from "wouter";
+import { useMutation } from "@tanstack/react-query";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
+import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/auth-context";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
-import { Building2, Loader2 } from "lucide-react";
+import { Building2, Mail, ArrowLeft, Loader2 } from "lucide-react";
+import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp";
+
+type AuthStep = "email" | "otp";
 
 export default function Login() {
-  const [, navigate] = useLocation();
+  const [, setLocation] = useLocation();
   const { login } = useAuth();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(false);
+  const [step, setStep] = useState<AuthStep>("email");
+  const [email, setEmail] = useState("");
+  const [otp, setOtp] = useState("");
 
-  const form = useForm<LoginFormData>({
-    resolver: zodResolver(loginSchema),
-    defaultValues: {
-      username: "",
-      password: "",
+  const requestOtpMutation = useMutation({
+    mutationFn: async (email: string) => {
+      const res = await apiRequest("POST", "/api/auth/request-otp", { email });
+      return res.json();
+    },
+    onSuccess: () => {
+      setStep("otp");
+      toast({
+        title: "OTP Sent",
+        description: "Please check your email for the verification code.",
+      });
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to send OTP",
+        variant: "destructive",
+      });
     },
   });
 
-  const onSubmit = async (data: LoginFormData) => {
-    setIsLoading(true);
-    try {
-      const response = await apiRequest("POST", "/api/auth/login", data);
-      const user = await response.json();
-      login(user);
+  const verifyOtpMutation = useMutation({
+    mutationFn: async ({ email, otp }: { email: string; otp: string }) => {
+      const res = await apiRequest("POST", "/api/auth/verify-otp", { email, otp });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      login(data.user);
+      
+      if (data.isNewUser) {
+        setLocation("/complete-profile");
+      } else {
+        redirectToDashboard(data.user.role);
+      }
+    },
+    onError: (error: Error) => {
       toast({
-        title: "Welcome back!",
-        description: `Signed in as ${user.fullName}`,
-      });
-      navigate("/");
-    } catch (error: any) {
-      toast({
-        title: "Login failed",
-        description: error.message || "Invalid credentials",
+        title: "Invalid OTP",
+        description: error.message || "Please check your code and try again",
         variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+    },
+  });
+
+  const redirectToDashboard = (role: string) => {
+    switch (role) {
+      case "admin":
+        setLocation("/admin");
+        break;
+      case "agent":
+      case "seller":
+        setLocation("/my-listings");
+        break;
+      default:
+        setLocation("/properties");
+    }
+  };
+
+  const handleEmailSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email) {
+      requestOtpMutation.mutate(email);
+    }
+  };
+
+  const handleOtpSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (otp.length === 6) {
+      verifyOtpMutation.mutate({ email, otp });
+    }
+  };
+
+  const handleOtpComplete = (value: string) => {
+    setOtp(value);
+    if (value.length === 6) {
+      verifyOtpMutation.mutate({ email, otp: value });
     }
   };
 
   return (
-    <div className="min-h-[80vh] flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center space-y-4">
-          <div className="flex justify-center">
-            <div className="flex h-12 w-12 items-center justify-center rounded-md bg-primary text-primary-foreground">
-              <Building2 className="h-6 w-6" />
+        <CardHeader className="text-center">
+          <div className="flex justify-center mb-4">
+            <div className="p-3 rounded-full bg-primary/10">
+              <Building2 className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <div>
-            <CardTitle className="text-2xl">Welcome back</CardTitle>
-            <CardDescription>Sign in to your PropMarket account</CardDescription>
-          </div>
+          <CardTitle className="text-2xl">Welcome to PropMarket</CardTitle>
+          <CardDescription>
+            {step === "email"
+              ? "Enter your email to receive a verification code"
+              : "Enter the 6-digit code sent to your email"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter your username"
-                        {...field}
-                        data-testid="input-username"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="Enter your password"
-                        {...field}
-                        data-testid="input-password"
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
+          {step === "email" ? (
+            <form onSubmit={handleEmailSubmit} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="email">Email Address</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="pl-10"
+                    required
+                    data-testid="input-email"
+                  />
+                </div>
+              </div>
               <Button
                 type="submit"
                 className="w-full"
-                disabled={isLoading}
-                data-testid="button-login"
+                disabled={requestOtpMutation.isPending}
+                data-testid="button-send-otp"
               >
-                {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                Sign In
+                {requestOtpMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  "Continue with Email"
+                )}
               </Button>
             </form>
-          </Form>
+          ) : (
+            <form onSubmit={handleOtpSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div className="text-center text-sm text-muted-foreground">
+                  Code sent to <span className="font-medium text-foreground">{email}</span>
+                </div>
+                <div className="flex justify-center">
+                  <InputOTP
+                    maxLength={6}
+                    value={otp}
+                    onChange={handleOtpComplete}
+                    data-testid="input-otp"
+                  >
+                    <InputOTPGroup>
+                      <InputOTPSlot index={0} />
+                      <InputOTPSlot index={1} />
+                      <InputOTPSlot index={2} />
+                      <InputOTPSlot index={3} />
+                      <InputOTPSlot index={4} />
+                      <InputOTPSlot index={5} />
+                    </InputOTPGroup>
+                  </InputOTP>
+                </div>
+              </div>
+              <Button
+                type="submit"
+                className="w-full"
+                disabled={verifyOtpMutation.isPending || otp.length !== 6}
+                data-testid="button-verify-otp"
+              >
+                {verifyOtpMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  "Verify Code"
+                )}
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => {
+                  setStep("email");
+                  setOtp("");
+                }}
+                data-testid="button-back-to-email"
+              >
+                <ArrowLeft className="mr-2 h-4 w-4" />
+                Use different email
+              </Button>
+              <div className="text-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => requestOtpMutation.mutate(email)}
+                  disabled={requestOtpMutation.isPending}
+                  data-testid="button-resend-otp"
+                >
+                  Didn't receive code? Resend
+                </Button>
+              </div>
+            </form>
+          )}
         </CardContent>
-        <CardFooter className="flex-col gap-4 text-center text-sm">
-          <p className="text-muted-foreground">
-            Don't have an account?{" "}
-            <Link href="/register" className="text-primary hover:underline" data-testid="link-register">
-              Create one
-            </Link>
-          </p>
-        </CardFooter>
       </Card>
     </div>
   );

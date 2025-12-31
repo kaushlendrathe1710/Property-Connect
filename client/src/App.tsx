@@ -12,7 +12,7 @@ import { AppSidebar } from "@/components/app-sidebar";
 import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Login from "@/pages/login";
-import Register from "@/pages/register";
+import CompleteProfile from "@/pages/complete-profile";
 import Properties from "@/pages/properties";
 import PropertyDetail from "@/pages/property-detail";
 import Favorites from "@/pages/favorites";
@@ -30,7 +30,7 @@ function Router() {
     <Switch>
       <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
-      <Route path="/register" component={Register} />
+      <Route path="/complete-profile" component={CompleteProfile} />
       <Route path="/properties" component={Properties} />
       <Route path="/property/:id" component={PropertyDetail} />
       <Route path="/favorites" component={Favorites} />

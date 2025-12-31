@@ -56,14 +56,14 @@ export default function Home() {
       title: "For Sellers",
       description: "List your property and reach thousands of potential buyers instantly",
       cta: "List Property",
-      href: "/register",
+      href: "/login",
     },
     {
       icon: TrendingUp,
       title: "For Agents",
       description: "Manage multiple listings, track leads, and grow your business",
       cta: "Join as Agent",
-      href: "/register",
+      href: "/login",
     },
   ];
 
@@ -90,7 +90,7 @@ export default function Home() {
               </Link>
             </Button>
             <Button asChild variant="outline" size="lg" data-testid="button-list-property">
-              <Link href="/register">List Your Property</Link>
+              <Link href="/login">List Your Property</Link>
             </Button>
           </div>
         </div>

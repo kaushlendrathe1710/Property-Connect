@@ -222,11 +222,11 @@ export function AppSidebar() {
           <div className="space-y-3">
             <div className="flex items-center gap-3 px-2">
               <Avatar className="h-9 w-9">
-                <AvatarImage src={user.avatar || undefined} alt={user.fullName} />
-                <AvatarFallback>{getInitials(user.fullName)}</AvatarFallback>
+                <AvatarImage src={user.avatar || undefined} alt={user.fullName || "User"} />
+                <AvatarFallback>{getInitials(user.fullName || user.email)}</AvatarFallback>
               </Avatar>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{user.fullName}</p>
+                <p className="text-sm font-medium truncate">{user.fullName || user.email}</p>
                 <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
               </div>
             </div>
@@ -243,10 +243,7 @@ export function AppSidebar() {
         ) : (
           <div className="space-y-2">
             <Button asChild className="w-full" data-testid="button-signin">
-              <Link href="/login">Sign In</Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full" data-testid="button-register">
-              <Link href="/register">Create Account</Link>
+              <Link href="/login">Sign In / Register</Link>
             </Button>
           </div>
         )}
