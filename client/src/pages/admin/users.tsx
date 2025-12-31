@@ -60,16 +60,17 @@ export default function AdminUsers() {
   const filteredUsers = useMemo(() => {
     if (!users) return [];
     return users.filter((u) => {
+      const searchLower = search.toLowerCase();
       const matchesSearch =
-        u.fullName.toLowerCase().includes(search.toLowerCase()) ||
-        u.email.toLowerCase().includes(search.toLowerCase()) ||
-        u.username.toLowerCase().includes(search.toLowerCase());
+        (u.fullName?.toLowerCase() || "").includes(searchLower) ||
+        u.email.toLowerCase().includes(searchLower);
       const matchesRole = roleFilter === "all" || u.role === roleFilter;
       return matchesSearch && matchesRole;
     });
   }, [users, search, roleFilter]);
 
-  const getInitials = (name: string) => {
+  const getInitials = (name: string | null) => {
+    if (!name) return "??";
     return name
       .split(" ")
       .map((n) => n[0])
@@ -170,11 +171,11 @@ export default function AdminUsers() {
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9">
                           <AvatarImage src={u.avatar || undefined} />
-                          <AvatarFallback>{getInitials(u.fullName)}</AvatarFallback>
+                          <AvatarFallback>{getInitials(u.fullName || u.email)}</AvatarFallback>
                         </Avatar>
                         <div>
-                          <p className="font-medium">{u.fullName}</p>
-                          <p className="text-sm text-muted-foreground">@{u.username}</p>
+                          <p className="font-medium">{u.fullName || u.email}</p>
+                          <p className="text-sm text-muted-foreground">{u.email}</p>
                         </div>
                       </div>
                     </TableCell>

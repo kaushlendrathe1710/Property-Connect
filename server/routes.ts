@@ -392,5 +392,41 @@ export async function registerRoutes(
     }
   });
 
+  // Create admin (super admin only)
+  app.post("/api/admin/create-admin", async (req, res) => {
+    try {
+      const { requesterId, email, fullName, phone } = req.body;
+      
+      // Verify requester is super admin
+      const requester = await storage.getUser(requesterId);
+      if (!requester || !requester.isSuperAdmin) {
+        return res.status(403).json({ message: "Only super admin can create admin accounts" });
+      }
+      
+      // Check if email already exists
+      const existing = await storage.getUserByEmail(email);
+      if (existing) {
+        return res.status(400).json({ message: "User with this email already exists" });
+      }
+      
+      // Create admin user
+      const newAdmin = await storage.createUser({
+        email: email.toLowerCase(),
+        fullName,
+        phone,
+        role: "admin",
+        avatar: null,
+        isActive: true,
+        isSuperAdmin: false,
+        onboardingComplete: true,
+      });
+      
+      res.status(201).json(newAdmin);
+    } catch (error) {
+      console.error("Create admin error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   return httpServer;
 }

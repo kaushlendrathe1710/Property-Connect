@@ -1,5 +1,9 @@
-import { useQuery } from "@tanstack/react-query";
+import { useState } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import {
   Building2,
   Users,
@@ -8,13 +12,37 @@ import {
   Clock,
   AlertTriangle,
   ArrowRight,
+  UserPlus,
+  Mail,
+  User,
+  Phone,
+  Loader2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { useAuth } from "@/context/auth-context";
-import type { Property, User } from "@shared/schema";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import type { Property, User as UserType } from "@shared/schema";
 
 interface DashboardStats {
   totalProperties: number;
@@ -23,8 +51,18 @@ interface DashboardStats {
   activeListings: number;
 }
 
+const createAdminSchema = z.object({
+  email: z.string().email("Please enter a valid email"),
+  fullName: z.string().min(2, "Name must be at least 2 characters"),
+  phone: z.string().min(10, "Please enter a valid phone number"),
+});
+
+type CreateAdminData = z.infer<typeof createAdminSchema>;
+
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
     queryKey: ["/api/admin/stats"],
@@ -36,10 +74,51 @@ export default function AdminDashboard() {
     enabled: user?.role === "admin",
   });
 
-  const { data: recentUsers, isLoading: usersLoading } = useQuery<User[]>({
+  const { data: recentUsers, isLoading: usersLoading } = useQuery<UserType[]>({
     queryKey: ["/api/admin/recent-users"],
     enabled: user?.role === "admin",
   });
+
+  const form = useForm<CreateAdminData>({
+    resolver: zodResolver(createAdminSchema),
+    defaultValues: {
+      email: "",
+      fullName: "",
+      phone: "",
+    },
+  });
+
+  const createAdminMutation = useMutation({
+    mutationFn: async (data: CreateAdminData) => {
+      const res = await apiRequest("POST", "/api/admin/create-admin", {
+        requesterId: user?.id,
+        ...data,
+      });
+      return res.json();
+    },
+    onSuccess: (newAdmin) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/stats"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/recent-users"] });
+      toast({
+        title: "Admin Created",
+        description: `${newAdmin.fullName} can now login with their email`,
+      });
+      setCreateDialogOpen(false);
+      form.reset();
+    },
+    onError: (error: Error) => {
+      toast({
+        title: "Failed to create admin",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = (data: CreateAdminData) => {
+    createAdminMutation.mutate(data);
+  };
 
   if (user?.role !== "admin") {
     return (
@@ -84,9 +163,112 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-8">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-bold" data-testid="text-page-title">Admin Dashboard</h1>
-        <p className="text-muted-foreground">Overview of your real estate platform</p>
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="space-y-2">
+          <h1 className="text-3xl font-bold" data-testid="text-page-title">Admin Dashboard</h1>
+          <p className="text-muted-foreground">Overview of your real estate platform</p>
+        </div>
+        
+        {user?.isSuperAdmin && (
+          <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2" data-testid="button-create-admin">
+                <UserPlus className="h-4 w-4" />
+                Create Admin
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Admin</DialogTitle>
+                <DialogDescription>
+                  Add a new admin user. They will be able to login using their email with OTP verification.
+                </DialogDescription>
+              </DialogHeader>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="email"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Email Address</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="admin@example.com"
+                              className="pl-10"
+                              {...field}
+                              data-testid="input-admin-email"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="fullName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Full Name</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="John Doe"
+                              className="pl-10"
+                              {...field}
+                              data-testid="input-admin-name"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="phone"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Phone Number</FormLabel>
+                        <FormControl>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              placeholder="+91 98765 43210"
+                              className="pl-10"
+                              {...field}
+                              data-testid="input-admin-phone"
+                            />
+                          </div>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={createAdminMutation.isPending}
+                    data-testid="button-submit-admin"
+                  >
+                    {createAdminMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Admin"
+                    )}
+                  </Button>
+                </form>
+              </Form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Stats Grid */}
@@ -209,11 +391,11 @@ export default function AdminDashboard() {
                   <div key={u.id} className="flex gap-3 items-center p-2 rounded-md hover-elevate">
                     <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
                       <span className="text-sm font-medium">
-                        {u.fullName.split(" ").map((n) => n[0]).join("").slice(0, 2)}
+                        {(u.fullName || u.email).split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
                       </span>
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">{u.fullName}</p>
+                      <p className="font-medium truncate">{u.fullName || u.email}</p>
                       <p className="text-sm text-muted-foreground">{u.email}</p>
                     </div>
                     <Badge variant="outline" className="capitalize">{u.role}</Badge>
