@@ -105,3 +105,17 @@ To reseed the database: `npx tsx server/seed.ts`
 ## Known Limitations
 - Client-side authentication (no server sessions for MVP)
 - Images use placeholder URLs from Unsplash
+
+## Railway Deployment
+
+To deploy to Railway:
+
+1. **Add PostgreSQL database** - Railway will create DATABASE_URL automatically
+2. **Set environment variables**:
+   - `SESSION_SECRET` - Random session string
+   - `SMTP_HOST` - Email SMTP host (e.g., smtp.gmail.com)
+   - `SMTP_PORT` - Usually 587
+   - `SMTP_USER` - Email username
+   - `SMTP_PASS` - Email password/app password
+3. **Build command**: `npm run build` (automatically pushes DB schema)
+4. **Start command**: `npm run start`

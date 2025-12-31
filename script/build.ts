@@ -1,6 +1,7 @@
 import { build as esbuild } from "esbuild";
 import { build as viteBuild } from "vite";
 import { rm, readFile } from "fs/promises";
+import { execSync } from "child_process";
 
 // server deps to bundle to reduce openat(2) syscalls
 // which helps cold start times
@@ -59,6 +60,20 @@ async function buildAll() {
     external: externals,
     logLevel: "info",
   });
+
+  // Push database schema in production builds
+  if (process.env.DATABASE_URL) {
+    console.log("pushing database schema...");
+    try {
+      execSync("npx drizzle-kit push", { stdio: "inherit" });
+      console.log("database schema pushed successfully");
+    } catch (err) {
+      console.error("Warning: Failed to push database schema:", err);
+      // Don't fail the build if db push fails - it might already be up to date
+    }
+  } else {
+    console.log("DATABASE_URL not set, skipping database schema push");
+  }
 }
 
 buildAll().catch((err) => {
