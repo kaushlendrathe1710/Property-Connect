@@ -10,23 +10,31 @@ import type { Property, Inquiry } from "@shared/schema";
 export default function Analytics() {
   const { user, isAuthenticated } = useAuth();
 
+  const isAdmin = user?.role === "admin";
+  const canViewAnalytics = isAuthenticated && (user?.role === "seller" || user?.role === "agent" || isAdmin);
+
   const { data: listings, isLoading: listingsLoading } = useQuery<Property[]>({
-    queryKey: ["/api/my-listings"],
-    enabled: isAuthenticated && (user?.role === "seller" || user?.role === "agent"),
+    queryKey: isAdmin ? ["/api/properties"] : ["/api/my-listings"],
+    enabled: canViewAnalytics,
   });
 
   const { data: inquiries, isLoading: inquiriesLoading } = useQuery<Inquiry[]>({
     queryKey: ["/api/inquiries"],
-    enabled: isAuthenticated && (user?.role === "seller" || user?.role === "agent"),
+    enabled: canViewAnalytics && !isAdmin,
   });
 
-  if (!isAuthenticated || (user?.role !== "seller" && user?.role !== "agent")) {
+  const { data: allInquiries, isLoading: allInquiriesLoading } = useQuery<Inquiry[]>({
+    queryKey: ["/api/admin/all-inquiries"],
+    enabled: canViewAnalytics && isAdmin,
+  });
+
+  if (!canViewAnalytics) {
     return (
       <div className="flex flex-col items-center justify-center py-20">
         <AlertTriangle className="h-16 w-16 text-muted-foreground mb-4" />
         <h2 className="text-xl font-semibold mb-2">Access Denied</h2>
         <p className="text-muted-foreground mb-6">
-          Only sellers and agents can view analytics
+          Only sellers, agents, and admins can view analytics
         </p>
         <Button asChild>
           <Link href="/">Go Home</Link>
@@ -35,14 +43,15 @@ export default function Analytics() {
     );
   }
 
-  const isLoading = listingsLoading || inquiriesLoading;
+  const isLoading = listingsLoading || inquiriesLoading || allInquiriesLoading;
+  const effectiveInquiries = isAdmin ? allInquiries : inquiries;
 
   const totalListings = listings?.length || 0;
   const activeListings = listings?.filter((l) => l.status === "approved").length || 0;
   const pendingListings = listings?.filter((l) => l.status === "pending").length || 0;
   const totalViews = listings?.reduce((sum, l) => sum + l.views, 0) || 0;
-  const totalInquiries = inquiries?.length || 0;
-  const unreadInquiries = inquiries?.filter((i) => !i.isRead).length || 0;
+  const totalInquiries = effectiveInquiries?.length || 0;
+  const unreadInquiries = effectiveInquiries?.filter((i) => !i.isRead).length || 0;
 
   const stats = [
     {

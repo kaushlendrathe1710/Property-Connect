@@ -54,6 +54,7 @@ export interface IStorage {
   getInquiry(id: string): Promise<Inquiry | undefined>;
   getInquiriesBySeller(sellerId: string): Promise<InquiryWithDetails[]>;
   getInquiriesByBuyer(buyerId: string): Promise<InquiryWithDetails[]>;
+  getAllInquiries(): Promise<InquiryWithDetails[]>;
   createInquiry(inquiry: InsertInquiry): Promise<Inquiry>;
   markInquiryAsRead(id: string): Promise<Inquiry | undefined>;
 
@@ -269,6 +270,12 @@ export class DatabaseStorage implements IStorage {
   async getInquiriesByBuyer(buyerId: string): Promise<InquiryWithDetails[]> {
     const result = await db.select().from(inquiries)
       .where(eq(inquiries.buyerId, buyerId))
+      .orderBy(desc(inquiries.createdAt));
+    return this.enrichInquiries(result);
+  }
+
+  async getAllInquiries(): Promise<InquiryWithDetails[]> {
+    const result = await db.select().from(inquiries)
       .orderBy(desc(inquiries.createdAt));
     return this.enrichInquiries(result);
   }

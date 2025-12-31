@@ -343,6 +343,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/admin/all-inquiries", async (req, res) => {
+    try {
+      const allInquiries = await storage.getAllInquiries();
+      res.json(allInquiries);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   app.patch("/api/admin/properties/:id/approve", async (req, res) => {
     try {
       const property = await storage.updateProperty(req.params.id, { status: "approved" });
