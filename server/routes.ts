@@ -1,63 +1,139 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { loginSchema, registerSchema, insertPropertySchema, insertInquirySchema } from "@shared/schema";
+import { requestOtpSchema, verifyOtpSchema, completeProfileSchema, insertPropertySchema, insertInquirySchema } from "@shared/schema";
 import { z } from "zod";
+import { sendOtpEmail, generateOtp } from "./email";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Auth routes
-  app.post("/api/auth/login", async (req, res) => {
+  // OTP Auth routes
+  app.post("/api/auth/request-otp", async (req, res) => {
     try {
-      const data = loginSchema.parse(req.body);
-      const user = await storage.getUserByUsername(data.username);
+      const data = requestOtpSchema.parse(req.body);
+      const email = data.email.toLowerCase();
       
-      if (!user || user.password !== data.password) {
-        return res.status(401).json({ message: "Invalid credentials" });
+      // Generate OTP
+      const otp = generateOtp();
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes
+      
+      // Store OTP
+      await storage.createOtpToken({
+        email,
+        otp,
+        expiresAt,
+        attempts: 0,
+        consumed: false,
+      });
+      
+      // Send email
+      const sent = await sendOtpEmail(email, otp);
+      if (!sent) {
+        return res.status(500).json({ message: "Failed to send OTP email" });
+      }
+      
+      res.json({ message: "OTP sent successfully" });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
+      console.error("OTP request error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.post("/api/auth/verify-otp", async (req, res) => {
+    try {
+      const data = verifyOtpSchema.parse(req.body);
+      const email = data.email.toLowerCase();
+      
+      // Validate OTP
+      const token = await storage.getValidOtpToken(email, data.otp);
+      if (!token) {
+        return res.status(401).json({ message: "Invalid or expired OTP" });
+      }
+      
+      // Consume the token
+      await storage.consumeOtpToken(token.id);
+      
+      // Check if user exists
+      let user = await storage.getUserByEmail(email);
+      let isNewUser = false;
+      
+      if (!user) {
+        // Create new user with just email
+        user = await storage.createUser({
+          email,
+          fullName: null,
+          phone: null,
+          role: "buyer",
+          avatar: null,
+          isActive: true,
+          isSuperAdmin: false,
+          onboardingComplete: false,
+        });
+        isNewUser = true;
       }
       
       if (!user.isActive) {
         return res.status(403).json({ message: "Account suspended" });
       }
-
-      const { password, ...userWithoutPassword } = user;
-      res.json(userWithoutPassword);
+      
+      res.json({
+        user,
+        isNewUser: !user.onboardingComplete,
+      });
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
       }
+      console.error("OTP verify error:", error);
       res.status(500).json({ message: "Server error" });
     }
   });
 
-  app.post("/api/auth/register", async (req, res) => {
+  app.post("/api/auth/complete-profile", async (req, res) => {
     try {
-      const data = registerSchema.parse(req.body);
+      const { userId, ...profileData } = req.body;
+      const data = completeProfileSchema.parse(profileData);
       
-      const existingUsername = await storage.getUserByUsername(data.username);
-      if (existingUsername) {
-        return res.status(400).json({ message: "Username already taken" });
-      }
-
-      const existingEmail = await storage.getUserByEmail(data.email);
-      if (existingEmail) {
-        return res.status(400).json({ message: "Email already registered" });
-      }
-
-      const user = await storage.createUser({
-        ...data,
-        avatar: null,
-        isActive: true,
+      const user = await storage.updateUser(userId, {
+        fullName: data.fullName,
+        phone: data.phone,
+        role: data.role,
+        onboardingComplete: true,
       });
-
-      const { password, ...userWithoutPassword } = user;
-      res.status(201).json(userWithoutPassword);
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(user);
     } catch (error) {
       if (error instanceof z.ZodError) {
         return res.status(400).json({ message: error.errors[0].message });
       }
+      console.error("Profile complete error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.get("/api/auth/me", async (req, res) => {
+    try {
+      const userId = req.query.userId as string;
+      if (!userId) {
+        return res.status(401).json({ message: "Not authenticated" });
+      }
+      
+      const user = await storage.getUser(userId);
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(user);
+    } catch (error) {
       res.status(500).json({ message: "Server error" });
     }
   });
@@ -251,9 +327,7 @@ export async function registerRoutes(
   app.get("/api/admin/users", async (req, res) => {
     try {
       const users = await storage.getAllUsers();
-      // Remove passwords from response
-      const safeUsers = users.map(({ password, ...user }) => user);
-      res.json(safeUsers);
+      res.json(users);
     } catch (error) {
       res.status(500).json({ message: "Server error" });
     }
@@ -262,8 +336,7 @@ export async function registerRoutes(
   app.get("/api/admin/recent-users", async (req, res) => {
     try {
       const users = await storage.getAllUsers();
-      // Remove passwords and return only recent 10
-      const safeUsers = users.slice(0, 10).map(({ password, ...user }) => user);
+      const safeUsers = users.slice(0, 10);
       res.json(safeUsers);
     } catch (error) {
       res.status(500).json({ message: "Server error" });
@@ -301,8 +374,19 @@ export async function registerRoutes(
       if (!user) {
         return res.status(404).json({ message: "User not found" });
       }
-      const { password, ...safeUser } = user;
-      res.json(safeUser);
+      res.json(user);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.delete("/api/admin/users/:id", async (req, res) => {
+    try {
+      const deleted = await storage.deleteUser(req.params.id);
+      if (!deleted) {
+        return res.status(400).json({ message: "Cannot delete this user" });
+      }
+      res.status(204).send();
     } catch (error) {
       res.status(500).json({ message: "Server error" });
     }

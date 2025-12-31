@@ -5,70 +5,64 @@ import { randomUUID } from "crypto";
 async function seed() {
   console.log("Seeding database...");
 
-  // Check if data already exists
+  // Check if super admin exists
   const existingUsers = await db.select().from(users);
-  if (existingUsers.length > 0) {
-    console.log("Database already has data, skipping seed.");
+  const superAdminExists = existingUsers.some(u => u.email === "kaushlendra.k12@fms.edu");
+  
+  if (superAdminExists) {
+    console.log("Super admin already exists, checking for sample data...");
+  } else {
+    // Create super admin
+    const superAdminId = randomUUID();
+    await db.insert(users).values({
+      id: superAdminId,
+      email: "kaushlendra.k12@fms.edu",
+      fullName: "Super Admin",
+      phone: "+91 9999999999",
+      role: "admin",
+      avatar: null,
+      isActive: true,
+      isSuperAdmin: true,
+      onboardingComplete: true,
+      createdAt: new Date(),
+    });
+    console.log("Super admin created: kaushlendra.k12@fms.edu");
+  }
+
+  // Check if we need sample properties
+  const existingProperties = await db.select().from(properties);
+  if (existingProperties.length > 0) {
+    console.log("Sample properties already exist, skipping...");
     return;
   }
 
-  // Create admin user
-  const adminId = randomUUID();
-  await db.insert(users).values({
-    id: adminId,
-    username: "admin",
-    password: "admin123",
-    email: "admin@propmarket.com",
-    fullName: "Admin User",
-    phone: "+1 (555) 000-0001",
-    role: "admin",
-    avatar: null,
-    isActive: true,
-    createdAt: new Date(),
-  });
-
-  // Create sample agent
+  // Create a sample agent for properties
   const agentId = randomUUID();
   await db.insert(users).values({
     id: agentId,
-    username: "agent1",
-    password: "agent123",
     email: "agent@propmarket.com",
     fullName: "Sarah Johnson",
     phone: "+1 (555) 123-4567",
     role: "agent",
     avatar: null,
     isActive: true,
+    isSuperAdmin: false,
+    onboardingComplete: true,
     createdAt: new Date(),
   });
 
-  // Create sample seller
+  // Create a sample seller
   const sellerId = randomUUID();
   await db.insert(users).values({
     id: sellerId,
-    username: "seller1",
-    password: "seller123",
     email: "seller@propmarket.com",
     fullName: "Michael Chen",
     phone: "+1 (555) 234-5678",
     role: "seller",
     avatar: null,
     isActive: true,
-    createdAt: new Date(),
-  });
-
-  // Create sample buyer
-  const buyerId = randomUUID();
-  await db.insert(users).values({
-    id: buyerId,
-    username: "buyer1",
-    password: "buyer123",
-    email: "buyer@propmarket.com",
-    fullName: "Emily Davis",
-    phone: "+1 (555) 345-6789",
-    role: "buyer",
-    avatar: null,
-    isActive: true,
+    isSuperAdmin: false,
+    onboardingComplete: true,
     createdAt: new Date(),
   });
 
@@ -240,7 +234,7 @@ async function seed() {
   }
 
   console.log("Database seeded successfully!");
-  console.log("Created 4 users and 6 properties.");
+  console.log("Created super admin and sample data.");
 }
 
 seed()
