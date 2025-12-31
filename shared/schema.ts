@@ -45,17 +45,17 @@ export const ListingStatus = {
 
 export type ListingStatusValue = typeof ListingStatus[keyof typeof ListingStatus];
 
-// Users table
+// Users table - Updated for OTP auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  username: text("username").notNull().unique(),
-  password: text("password").notNull(),
   email: text("email").notNull().unique(),
-  fullName: text("full_name").notNull(),
+  fullName: text("full_name"),
   phone: text("phone"),
   role: text("role").notNull().default("buyer"),
   avatar: text("avatar"),
   isActive: boolean("is_active").notNull().default(true),
+  isSuperAdmin: boolean("is_super_admin").notNull().default(false),
+  onboardingComplete: boolean("onboarding_complete").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
 });
 
@@ -67,13 +67,32 @@ export const insertUserSchema = createInsertSchema(users).omit({
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type User = typeof users.$inferSelect;
 
+// OTP Tokens table
+export const otpTokens = pgTable("otp_tokens", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  email: text("email").notNull(),
+  otp: text("otp").notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  consumed: boolean("consumed").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertOtpTokenSchema = createInsertSchema(otpTokens).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertOtpToken = z.infer<typeof insertOtpTokenSchema>;
+export type OtpToken = typeof otpTokens.$inferSelect;
+
 // Properties table
 export const properties = pgTable("properties", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   title: text("title").notNull(),
   description: text("description").notNull(),
-  listingType: text("listing_type").notNull(), // sale or lease
-  propertyType: text("property_type").notNull(), // house, apartment, etc.
+  listingType: text("listing_type").notNull(),
+  propertyType: text("property_type").notNull(),
   price: decimal("price", { precision: 12, scale: 2 }).notNull(),
   address: text("address").notNull(),
   city: text("city").notNull(),
@@ -86,8 +105,8 @@ export const properties = pgTable("properties", {
   images: text("images").array().notNull().default(sql`ARRAY[]::text[]`),
   amenities: text("amenities").array().default(sql`ARRAY[]::text[]`),
   status: text("status").notNull().default("pending"),
-  ownerId: varchar("owner_id").notNull(), // seller or agent who created
-  ownerType: text("owner_type").notNull(), // 'seller' or 'agent'
+  ownerId: varchar("owner_id").notNull(),
+  ownerType: text("owner_type").notNull(),
   views: integer("views").notNull().default(0),
   isFeatured: boolean("is_featured").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow(),
@@ -107,7 +126,7 @@ export const inquiries = pgTable("inquiries", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   propertyId: varchar("property_id").notNull(),
   buyerId: varchar("buyer_id").notNull(),
-  sellerId: varchar("seller_id").notNull(), // property owner
+  sellerId: varchar("seller_id").notNull(),
   message: text("message").notNull(),
   phone: text("phone"),
   email: text("email").notNull(),
@@ -150,18 +169,19 @@ export type InquiryWithDetails = Inquiry & {
   buyer: Pick<User, "id" | "fullName" | "email" | "phone" | "avatar">;
 };
 
-// Form validation schemas
-export const loginSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+// Form validation schemas for OTP auth
+export const requestOtpSchema = z.object({
+  email: z.string().email("Please enter a valid email"),
 });
 
-export const registerSchema = z.object({
-  username: z.string().min(3, "Username must be at least 3 characters"),
-  password: z.string().min(6, "Password must be at least 6 characters"),
+export const verifyOtpSchema = z.object({
   email: z.string().email("Please enter a valid email"),
+  otp: z.string().length(6, "OTP must be 6 digits"),
+});
+
+export const completeProfileSchema = z.object({
   fullName: z.string().min(2, "Full name must be at least 2 characters"),
-  phone: z.string().optional(),
+  phone: z.string().min(10, "Please enter a valid phone number"),
   role: z.enum(["buyer", "seller", "agent"]),
 });
 
@@ -189,7 +209,8 @@ export const inquiryFormSchema = z.object({
   email: z.string().email("Please enter a valid email"),
 });
 
-export type LoginFormData = z.infer<typeof loginSchema>;
-export type RegisterFormData = z.infer<typeof registerSchema>;
+export type RequestOtpData = z.infer<typeof requestOtpSchema>;
+export type VerifyOtpData = z.infer<typeof verifyOtpSchema>;
+export type CompleteProfileData = z.infer<typeof completeProfileSchema>;
 export type PropertyFormData = z.infer<typeof propertyFormSchema>;
 export type InquiryFormData = z.infer<typeof inquiryFormSchema>;

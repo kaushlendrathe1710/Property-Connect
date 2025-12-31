@@ -1,10 +1,11 @@
 import { db } from "./db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, lt } from "drizzle-orm";
 import {
   users,
   properties,
   inquiries,
   favorites,
+  otpTokens,
   type User,
   type InsertUser,
   type Property,
@@ -15,17 +16,27 @@ import {
   type InsertFavorite,
   type PropertyWithOwner,
   type InquiryWithDetails,
+  type OtpToken,
+  type InsertOtpToken,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
 export interface IStorage {
   // Users
   getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
   getUserByEmail(email: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
+  updateUser(id: string, updates: Partial<User>): Promise<User | undefined>;
   getAllUsers(): Promise<User[]>;
   updateUserStatus(id: string, isActive: boolean): Promise<User | undefined>;
+  deleteUser(id: string): Promise<boolean>;
+
+  // OTP Tokens
+  createOtpToken(token: InsertOtpToken): Promise<OtpToken>;
+  getValidOtpToken(email: string, otp: string): Promise<OtpToken | undefined>;
+  consumeOtpToken(id: string): Promise<void>;
+  incrementOtpAttempts(id: string): Promise<void>;
+  cleanupExpiredOtps(): Promise<void>;
 
   // Properties
   getProperty(id: string): Promise<Property | undefined>;
@@ -68,23 +79,27 @@ export class DatabaseStorage implements IStorage {
     return user;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.username, username));
-    return user;
-  }
-
   async getUserByEmail(email: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.email, email));
+    const [user] = await db.select().from(users).where(eq(users.email, email.toLowerCase()));
     return user;
   }
 
   async createUser(insertUser: InsertUser): Promise<User> {
     const [user] = await db.insert(users).values({
       ...insertUser,
+      email: insertUser.email.toLowerCase(),
       id: randomUUID(),
       isActive: true,
       createdAt: new Date(),
     }).returning();
+    return user;
+  }
+
+  async updateUser(id: string, updates: Partial<User>): Promise<User | undefined> {
+    const [user] = await db.update(users)
+      .set(updates)
+      .where(eq(users.id, id))
+      .returning();
     return user;
   }
 
@@ -98,6 +113,64 @@ export class DatabaseStorage implements IStorage {
       .where(eq(users.id, id))
       .returning();
     return user;
+  }
+
+  async deleteUser(id: string): Promise<boolean> {
+    // Check if user is super admin
+    const user = await this.getUser(id);
+    if (user?.isSuperAdmin) {
+      return false; // Cannot delete super admin
+    }
+    const result = await db.delete(users).where(eq(users.id, id)).returning();
+    return result.length > 0;
+  }
+
+  // OTP Tokens
+  async createOtpToken(insertToken: InsertOtpToken): Promise<OtpToken> {
+    // First, delete any existing tokens for this email
+    await db.delete(otpTokens).where(eq(otpTokens.email, insertToken.email.toLowerCase()));
+    
+    const [token] = await db.insert(otpTokens).values({
+      ...insertToken,
+      email: insertToken.email.toLowerCase(),
+      id: randomUUID(),
+      createdAt: new Date(),
+    }).returning();
+    return token;
+  }
+
+  async getValidOtpToken(email: string, otp: string): Promise<OtpToken | undefined> {
+    const [token] = await db.select().from(otpTokens)
+      .where(and(
+        eq(otpTokens.email, email.toLowerCase()),
+        eq(otpTokens.otp, otp),
+        eq(otpTokens.consumed, false)
+      ));
+    
+    if (!token) return undefined;
+    if (token.expiresAt < new Date()) return undefined;
+    if (token.attempts >= 5) return undefined;
+    
+    return token;
+  }
+
+  async consumeOtpToken(id: string): Promise<void> {
+    await db.update(otpTokens)
+      .set({ consumed: true })
+      .where(eq(otpTokens.id, id));
+  }
+
+  async incrementOtpAttempts(id: string): Promise<void> {
+    const token = await db.select().from(otpTokens).where(eq(otpTokens.id, id));
+    if (token.length > 0) {
+      await db.update(otpTokens)
+        .set({ attempts: token[0].attempts + 1 })
+        .where(eq(otpTokens.id, id));
+    }
+  }
+
+  async cleanupExpiredOtps(): Promise<void> {
+    await db.delete(otpTokens).where(lt(otpTokens.expiresAt, new Date()));
   }
 
   // Properties
