@@ -102,6 +102,45 @@ The application uses PostgreSQL (Neon) for data persistence. Tables:
 
 To reseed the database: `npx tsx server/seed.ts`
 
+## Mobile App (mobile/)
+
+A complete React Native mobile app built with Expo that connects to the same backend API.
+
+### Features
+- Passwordless OTP authentication
+- Property browsing with search and filters
+- Favorites (buyers)
+- Inquiry messaging
+- My Listings (sellers/agents)
+- User profile management
+- Light/dark mode support
+
+### Running the Mobile App
+```bash
+cd mobile
+npm install
+npm start
+```
+
+### Building for Production
+```bash
+# Install EAS CLI
+npm install -g eas-cli
+
+# Build for Android
+eas build --platform android
+
+# Build for iOS  
+eas build --platform ios
+```
+
+### App Store Requirements
+- iOS: Apple Developer account ($99/year)
+- Android: Google Play Developer account ($25 one-time)
+
+### API Configuration
+The app connects to `https://property.lelekart.com`. To change, edit `mobile/lib/api.ts`.
+
 ## Known Limitations
 - Client-side authentication (no server sessions for MVP)
 - Images use placeholder URLs from Unsplash
