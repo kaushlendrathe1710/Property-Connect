@@ -88,12 +88,20 @@ A comprehensive real estate platform with four user types (Admins, Agents, Selle
 
 ## Recent Changes
 - Initial MVP implementation with all core features
-- In-memory storage for MVP phase
+- PostgreSQL database with Drizzle ORM for permanent data storage
 - Role-based access control on frontend
 - Property search and filtering
 - Inquiry messaging system
 
+## Database
+The application uses PostgreSQL (Neon) for data persistence. Tables:
+- `users` - User accounts with roles
+- `properties` - Property listings
+- `inquiries` - Buyer inquiries to sellers
+- `favorites` - User saved properties
+
+To reseed the database: `npx tsx server/seed.ts`
+
 ## Known Limitations
-- No persistent database (using in-memory storage)
 - Client-side authentication (no server sessions for MVP)
 - Images use placeholder URLs from Unsplash
