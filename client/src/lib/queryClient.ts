@@ -7,6 +7,19 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+function getUserId(): string | null {
+  try {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      const user = JSON.parse(storedUser);
+      return user.id;
+    }
+  } catch {
+    // Ignore parse errors
+  }
+  return null;
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -29,7 +42,26 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const userId = getUserId();
+    let url = queryKey[0] as string;
+    
+    // If there's an ID parameter in queryKey, append it
+    if (queryKey.length > 1 && queryKey[1]) {
+      url = `${queryKey[0]}/${queryKey[1]}`;
+    }
+    
+    // Append userId as query parameter for certain endpoints
+    if (userId && (
+      url.includes("/api/favorites") ||
+      url.includes("/api/inquiries") ||
+      url.includes("/api/my-inquiries") ||
+      url.includes("/api/my-listings")
+    )) {
+      const separator = url.includes("?") ? "&" : "?";
+      url = `${url}${separator}userId=${userId}`;
+    }
+
+    const res = await fetch(url, {
       credentials: "include",
     });
 
