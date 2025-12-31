@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { requestOtpSchema, verifyOtpSchema, completeProfileSchema, insertPropertySchema, insertInquirySchema } from "@shared/schema";
+import { requestOtpSchema, verifyOtpSchema, completeProfileSchema, insertPropertySchema, insertInquirySchema, createAdminSchema } from "@shared/schema";
 import { z } from "zod";
 import { sendOtpEmail, generateOtp } from "./email";
 
@@ -395,11 +395,16 @@ export async function registerRoutes(
   // Create admin (super admin only)
   app.post("/api/admin/create-admin", async (req, res) => {
     try {
-      const { requesterId, email, fullName, phone } = req.body;
+      // Validate request body with Zod schema
+      const validatedData = createAdminSchema.parse(req.body);
+      const { requesterId, email, fullName, phone } = validatedData;
       
-      // Verify requester is super admin
+      // Verify requester exists and is super admin
       const requester = await storage.getUser(requesterId);
-      if (!requester || !requester.isSuperAdmin) {
+      if (!requester) {
+        return res.status(403).json({ message: "Invalid requester" });
+      }
+      if (!requester.isSuperAdmin) {
         return res.status(403).json({ message: "Only super admin can create admin accounts" });
       }
       
@@ -409,7 +414,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "User with this email already exists" });
       }
       
-      // Create admin user
+      // Create admin user with full profile (onboardingComplete=true so they can login immediately)
       const newAdmin = await storage.createUser({
         email: email.toLowerCase(),
         fullName,
@@ -423,6 +428,9 @@ export async function registerRoutes(
       
       res.status(201).json(newAdmin);
     } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ message: error.errors[0].message });
+      }
       console.error("Create admin error:", error);
       res.status(500).json({ message: "Server error" });
     }

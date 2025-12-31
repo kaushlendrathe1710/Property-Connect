@@ -209,8 +209,16 @@ export const inquiryFormSchema = z.object({
   email: z.string().email("Please enter a valid email"),
 });
 
+export const createAdminSchema = z.object({
+  requesterId: z.string().min(1, "Requester ID is required"),
+  email: z.string().email("Please enter a valid email"),
+  fullName: z.string().min(2, "Full name must be at least 2 characters"),
+  phone: z.string().min(10, "Please enter a valid phone number"),
+});
+
 export type RequestOtpData = z.infer<typeof requestOtpSchema>;
 export type VerifyOtpData = z.infer<typeof verifyOtpSchema>;
 export type CompleteProfileData = z.infer<typeof completeProfileSchema>;
 export type PropertyFormData = z.infer<typeof propertyFormSchema>;
 export type InquiryFormData = z.infer<typeof inquiryFormSchema>;
+export type CreateAdminData = z.infer<typeof createAdminSchema>;
