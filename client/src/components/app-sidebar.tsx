@@ -14,6 +14,7 @@ import {
   LogOut,
   User,
   UserCircle,
+  FileCheck,
 } from "lucide-react";
 import {
   Sidebar,
@@ -109,6 +110,11 @@ const adminMenuItems = [
     title: "Pending Approvals",
     url: "/admin/approvals",
     icon: CheckCircle,
+  },
+  {
+    title: "Verifications",
+    url: "/admin/verifications",
+    icon: FileCheck,
   },
   {
     title: "All Listings",

@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
-import { Plus, Building2, Edit, Trash2, Eye, MoreVertical, AlertCircle } from "lucide-react";
+import { Plus, Building2, Edit, Trash2, Eye, MoreVertical, AlertCircle, FileCheck, Upload, BadgeCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -70,11 +70,29 @@ export default function MyListings() {
       case "rejected":
         return <Badge variant="destructive">Rejected</Badge>;
       case "sold":
-        return <Badge className="bg-green-600">Sold</Badge>;
+        return <Badge className="bg-green-600 text-white">Sold</Badge>;
       case "leased":
-        return <Badge className="bg-blue-600">Leased</Badge>;
+        return <Badge className="bg-blue-600 text-white">Leased</Badge>;
       default:
         return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
+  const getVerificationBadge = (status: string) => {
+    switch (status) {
+      case "verified":
+        return (
+          <Badge className="bg-green-600 text-white gap-1">
+            <BadgeCheck className="h-3 w-3" />
+            Verified
+          </Badge>
+        );
+      case "pending":
+        return <Badge variant="secondary">Verification Pending</Badge>;
+      case "rejected":
+        return <Badge variant="destructive">Verification Rejected</Badge>;
+      default:
+        return <Badge variant="outline">Not Verified</Badge>;
     }
   };
 
@@ -171,6 +189,12 @@ export default function MyListings() {
                               Edit
                             </Link>
                           </DropdownMenuItem>
+                          <DropdownMenuItem asChild>
+                            <Link href={`/listing/${listing.id}/documents`} className="flex items-center gap-2">
+                              <Upload className="h-4 w-4" />
+                              Documents
+                            </Link>
+                          </DropdownMenuItem>
                           <AlertDialog>
                             <AlertDialogTrigger asChild>
                               <DropdownMenuItem
@@ -208,6 +232,7 @@ export default function MyListings() {
                         {listing.listingType === "lease" && <span className="text-xs font-normal">/mo</span>}
                       </span>
                       {getStatusBadge(listing.status)}
+                      {getVerificationBadge(listing.verificationStatus)}
                       <Badge variant="outline" className="capitalize">{listing.propertyType}</Badge>
                     </div>
                     <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">

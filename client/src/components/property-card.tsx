@@ -1,4 +1,4 @@
-import { Heart, MapPin, Bed, Bath, Square, Eye, Calendar, Home, TrendingUp } from "lucide-react";
+import { Heart, MapPin, Bed, Bath, Square, Eye, Calendar, Home, TrendingUp, BadgeCheck } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -89,6 +89,12 @@ export function PropertyCard({
           >
             For {property.listingType === "sale" ? "Sale" : "Rent"}
           </Badge>
+          {property.verificationStatus === "verified" && (
+            <Badge className="text-xs font-semibold shadow-md gap-1 bg-green-600 text-white" data-testid={`badge-verified-${property.id}`}>
+              <BadgeCheck className="h-3 w-3" />
+              Verified
+            </Badge>
+          )}
           {property.isFeatured && (
             <Badge variant="destructive" className="text-xs font-semibold shadow-md gap-1">
               <TrendingUp className="h-3 w-3" />

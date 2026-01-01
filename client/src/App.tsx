@@ -25,6 +25,8 @@ import Profile from "@/pages/profile";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminApprovals from "@/pages/admin/approvals";
 import AdminUsers from "@/pages/admin/users";
+import ListingDocuments from "@/pages/listing-documents";
+import AdminVerifications from "@/pages/admin-verifications";
 
 function Router() {
   return (
@@ -46,6 +48,8 @@ function Router() {
       <Route path="/admin/users" component={AdminUsers} />
       <Route path="/admin/listings" component={Properties} />
       <Route path="/admin/analytics" component={Analytics} />
+      <Route path="/admin/verifications" component={AdminVerifications} />
+      <Route path="/listing/:id/documents" component={ListingDocuments} />
       <Route component={NotFound} />
     </Switch>
   );
