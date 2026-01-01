@@ -63,21 +63,35 @@ export async function registerRoutes(
       let isNewUser = false;
       
       if (!user) {
+        // Check if this is the super admin email
+        const isSuperAdminEmail = email === "kaushlendra.k12@fms.edu";
+        
         // Create new user with just email
         user = await storage.createUser({
           email,
-          fullName: null,
+          fullName: isSuperAdminEmail ? "Super Admin" : null,
           phone: null,
-          role: "buyer",
+          role: isSuperAdminEmail ? "admin" : "buyer",
           avatar: null,
           isActive: true,
-          isSuperAdmin: false,
-          onboardingComplete: false,
+          isSuperAdmin: isSuperAdminEmail,
+          onboardingComplete: isSuperAdminEmail, // Super admin skips onboarding
         });
-        isNewUser = true;
+        isNewUser = !isSuperAdminEmail; // Super admin is not a "new user"
+      } else if (email === "kaushlendra.k12@fms.edu" && !user.onboardingComplete) {
+        // Fix super admin if they exist but onboarding not complete
+        const updatedUser = await storage.updateUser(user.id, {
+          role: "admin",
+          isSuperAdmin: true,
+          onboardingComplete: true,
+          fullName: user.fullName || "Super Admin",
+        });
+        if (updatedUser) {
+          user = updatedUser;
+        }
       }
       
-      if (!user.isActive) {
+      if (!user || !user.isActive) {
         return res.status(403).json({ message: "Account suspended" });
       }
       
