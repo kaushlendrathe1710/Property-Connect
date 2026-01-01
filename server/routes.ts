@@ -152,6 +152,52 @@ export async function registerRoutes(
     }
   });
 
+  // Profile update endpoint
+  app.patch("/api/users/:id/profile", async (req, res) => {
+    try {
+      const userId = req.params.id;
+      const { fullName, phone, requesterId } = req.body;
+      
+      // Authorization check: user can only update their own profile
+      if (!requesterId) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
+      
+      // Get requester to check if they're authorized
+      const requester = await storage.getUser(requesterId);
+      if (!requester) {
+        return res.status(401).json({ message: "Invalid authentication" });
+      }
+      
+      // Only allow users to update their own profile, or admins to update any profile
+      if (requesterId !== userId && requester.role !== "admin") {
+        return res.status(403).json({ message: "You can only update your own profile" });
+      }
+      
+      if (!fullName || fullName.length < 2) {
+        return res.status(400).json({ message: "Full name must be at least 2 characters" });
+      }
+      
+      if (!phone || phone.length < 10) {
+        return res.status(400).json({ message: "Please enter a valid phone number" });
+      }
+      
+      const user = await storage.updateUser(userId, {
+        fullName,
+        phone,
+      });
+      
+      if (!user) {
+        return res.status(404).json({ message: "User not found" });
+      }
+      
+      res.json(user);
+    } catch (error) {
+      console.error("Profile update error:", error);
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
   // Properties routes
   app.get("/api/properties", async (req, res) => {
     try {

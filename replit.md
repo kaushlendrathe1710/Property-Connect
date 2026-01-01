@@ -35,6 +35,9 @@ A comprehensive real estate platform with four user types (Admins, Agents, Selle
 - `/login` - User login
 - `/register` - User registration
 
+### All Authenticated Users
+- `/profile` - View and edit user profile
+
 ### Buyer
 - `/favorites` - Saved favorite properties
 
@@ -78,6 +81,9 @@ A comprehensive real estate platform with four user types (Admins, Agents, Selle
 - GET `/api/my-inquiries` - Inquiries sent by buyer
 - POST `/api/inquiries` - Send inquiry
 
+### Profile
+- PATCH `/api/users/:id/profile` - Update user profile (fullName, phone)
+
 ### Admin
 - GET `/api/admin/stats` - Dashboard statistics
 - GET `/api/admin/pending-listings` - Pending approvals
@@ -87,6 +93,10 @@ A comprehensive real estate platform with four user types (Admins, Agents, Selle
 - PATCH `/api/admin/users/:id/status` - Update user status
 
 ## Recent Changes
+- Added user profile page with edit functionality (`/profile`)
+- Enhanced property cards with professional 99acres-style design
+- Improved logout flow with redirect to home page
+- Fixed super admin auto-recognition and onboarding bypass
 - Initial MVP implementation with all core features
 - PostgreSQL database with Drizzle ORM for permanent data storage
 - Role-based access control on frontend

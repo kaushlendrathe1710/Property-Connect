@@ -13,6 +13,7 @@ import {
   CheckCircle,
   LogOut,
   User,
+  UserCircle,
 } from "lucide-react";
 import {
   Sidebar,
@@ -219,26 +220,41 @@ export function AppSidebar() {
 
       <SidebarFooter className="p-4">
         {isAuthenticated && user ? (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 px-2">
-              <Avatar className="h-9 w-9">
-                <AvatarImage src={user.avatar || undefined} alt={user.fullName || "User"} />
-                <AvatarFallback>{getInitials(user.fullName || user.email)}</AvatarFallback>
-              </Avatar>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium truncate">{user.fullName || user.email}</p>
-                <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+          <div className="space-y-2">
+            <Link href="/profile" className="block">
+              <div className="flex items-center gap-3 px-2 py-2 rounded-md hover-elevate cursor-pointer">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage src={user.avatar || undefined} alt={user.fullName || "User"} />
+                  <AvatarFallback>{getInitials(user.fullName || user.email)}</AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{user.fullName || user.email}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{user.role}</p>
+                </div>
               </div>
+            </Link>
+            <div className="flex gap-2">
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="flex-1 justify-start gap-2"
+              >
+                <Link href="/profile" data-testid="button-edit-profile">
+                  <UserCircle className="h-4 w-4" />
+                  Edit Profile
+                </Link>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="justify-start gap-2"
+                onClick={logout}
+                data-testid="button-logout"
+              >
+                <LogOut className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              className="w-full justify-start gap-2"
-              onClick={logout}
-              data-testid="button-logout"
-            >
-              <LogOut className="h-4 w-4" />
-              Sign Out
-            </Button>
           </div>
         ) : (
           <div className="space-y-2">

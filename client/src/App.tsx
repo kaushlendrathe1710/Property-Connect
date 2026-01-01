@@ -21,6 +21,7 @@ import CreateListing from "@/pages/create-listing";
 import Inquiries from "@/pages/inquiries";
 import MyInquiries from "@/pages/my-inquiries";
 import Analytics from "@/pages/analytics";
+import Profile from "@/pages/profile";
 import AdminDashboard from "@/pages/admin/dashboard";
 import AdminApprovals from "@/pages/admin/approvals";
 import AdminUsers from "@/pages/admin/users";
@@ -39,6 +40,7 @@ function Router() {
       <Route path="/inquiries" component={Inquiries} />
       <Route path="/my-inquiries" component={MyInquiries} />
       <Route path="/analytics" component={Analytics} />
+      <Route path="/profile" component={Profile} />
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/approvals" component={AdminApprovals} />
       <Route path="/admin/users" component={AdminUsers} />

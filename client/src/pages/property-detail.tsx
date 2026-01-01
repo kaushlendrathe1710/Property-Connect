@@ -347,10 +347,10 @@ export default function PropertyDetail() {
                 <div className="flex items-center gap-3">
                   <Avatar className="h-12 w-12">
                     <AvatarImage src={property.owner.avatar || undefined} />
-                    <AvatarFallback>{getInitials(property.owner.fullName)}</AvatarFallback>
+                    <AvatarFallback>{getInitials(property.owner.fullName || "Owner")}</AvatarFallback>
                   </Avatar>
                   <div>
-                    <p className="font-semibold">{property.owner.fullName}</p>
+                    <p className="font-semibold">{property.owner.fullName || "Property Owner"}</p>
                     <p className="text-sm text-muted-foreground capitalize">{property.owner.role}</p>
                   </div>
                 </div>
