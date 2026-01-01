@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,7 +15,7 @@ type AuthStep = "email" | "otp";
 
 export default function Login() {
   const [, setLocation] = useLocation();
-  const { login } = useAuth();
+  const { login, user, isAuthenticated, isLoading } = useAuth();
   const { toast } = useToast();
   const [step, setStep] = useState<AuthStep>("email");
   const [email, setEmail] = useState("");
@@ -78,6 +78,13 @@ export default function Login() {
         setLocation("/properties");
     }
   };
+
+  // Redirect authenticated users to their dashboard
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && user) {
+      redirectToDashboard(user.role);
+    }
+  }, [isLoading, isAuthenticated, user]);
 
   const handleEmailSubmit = (e: React.FormEvent) => {
     e.preventDefault();
