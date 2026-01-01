@@ -30,6 +30,7 @@ export default function RootLayout() {
           <Stack.Screen name="login" options={{ headerShown: false }} />
           <Stack.Screen name="onboarding" options={{ headerShown: false }} />
           <Stack.Screen name="property/[id]" options={{ title: 'Property Details' }} />
+          <Stack.Screen name="edit-profile" options={{ title: 'Edit Profile' }} />
         </Stack>
       </AuthProvider>
     </QueryClientProvider>

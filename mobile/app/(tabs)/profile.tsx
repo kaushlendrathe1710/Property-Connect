@@ -40,7 +40,7 @@ export default function Profile() {
   };
 
   const menuItems = [
-    { icon: 'person-outline', label: 'Edit Profile', onPress: () => {} },
+    { icon: 'person-outline', label: 'Edit Profile', onPress: () => router.push('/edit-profile') },
     { icon: 'notifications-outline', label: 'Notifications', onPress: () => {} },
     { icon: 'shield-outline', label: 'Privacy', onPress: () => {} },
     { icon: 'help-circle-outline', label: 'Help & Support', onPress: () => {} },

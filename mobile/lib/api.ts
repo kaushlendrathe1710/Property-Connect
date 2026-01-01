@@ -181,6 +181,13 @@ class ApiClient {
       body: JSON.stringify(data),
     });
   }
+
+  async updateProfile(userId: string, data: { fullName: string; phone: string }): Promise<User> {
+    return this.request(`/api/users/${userId}/profile`, {
+      method: 'PATCH',
+      body: JSON.stringify({ ...data, requesterId: userId }),
+    });
+  }
 }
 
 export const api = new ApiClient();
