@@ -4,6 +4,21 @@ import { storage } from "./storage";
 import { requestOtpSchema, verifyOtpSchema, completeProfileSchema, insertPropertySchema, insertInquirySchema, createAdminSchema } from "@shared/schema";
 import { z } from "zod";
 import { sendOtpEmail, generateOtp } from "./email";
+import multer from "multer";
+import { uploadToS3, deleteFromS3, isS3Configured } from "./s3-service";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB limit
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/png", "image/jpg"];
+    if (allowedTypes.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Invalid file type. Only PDF and images are allowed."));
+    }
+  },
+});
 
 export async function registerRoutes(
   httpServer: Server,
@@ -503,6 +518,183 @@ export async function registerRoutes(
       console.error("Create admin error:", error);
       res.status(500).json({ message: "Server error" });
     }
+  });
+
+  // Document upload routes
+  app.post("/api/properties/:id/documents", upload.single("document"), async (req, res) => {
+    try {
+      if (!isS3Configured()) {
+        return res.status(503).json({ message: "File storage is not configured" });
+      }
+
+      const propertyId = req.params.id;
+      const { documentType, userId } = req.body;
+      const file = req.file;
+
+      if (!file) {
+        return res.status(400).json({ message: "No file uploaded" });
+      }
+
+      if (!documentType) {
+        return res.status(400).json({ message: "Document type is required" });
+      }
+
+      // Verify property exists and user owns it
+      const property = await storage.getProperty(propertyId);
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      if (property.ownerId !== userId) {
+        const user = await storage.getUser(userId);
+        if (!user || user.role !== "admin") {
+          return res.status(403).json({ message: "You can only upload documents for your own properties" });
+        }
+      }
+
+      // Upload to S3
+      const { url } = await uploadToS3(
+        file.buffer,
+        file.originalname,
+        file.mimetype,
+        `properties/${propertyId}`
+      );
+
+      // Save document record
+      const document = await storage.addPropertyDocument({
+        propertyId,
+        documentType,
+        fileName: file.originalname,
+        fileUrl: url,
+        fileSize: file.size,
+        mimeType: file.mimetype,
+      });
+
+      // Update property verification status to pending if documents are uploaded
+      if (property.verificationStatus === "unverified") {
+        await storage.updateProperty(propertyId, { verificationStatus: "pending" });
+      }
+
+      res.status(201).json(document);
+    } catch (error: any) {
+      console.error("Document upload error:", error);
+      res.status(500).json({ message: error.message || "Failed to upload document" });
+    }
+  });
+
+  app.get("/api/properties/:id/documents", async (req, res) => {
+    try {
+      const propertyId = req.params.id;
+      const documents = await storage.getPropertyDocuments(propertyId);
+      res.json(documents);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.delete("/api/documents/:id", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      
+      // Get the document to find the file URL
+      const documents = await storage.getPropertyDocuments(req.params.id);
+      const document = documents.find(d => d.id === req.params.id);
+      
+      if (!document) {
+        return res.status(404).json({ message: "Document not found" });
+      }
+
+      // Verify ownership or admin
+      const property = await storage.getProperty(document.propertyId);
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      if (property.ownerId !== userId) {
+        const user = await storage.getUser(userId);
+        if (!user || user.role !== "admin") {
+          return res.status(403).json({ message: "Not authorized to delete this document" });
+        }
+      }
+
+      // Delete from storage
+      await storage.deletePropertyDocument(req.params.id);
+      res.status(204).send();
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Verification routes
+  app.get("/api/admin/pending-verifications", async (req, res) => {
+    try {
+      const properties = await storage.getPendingVerificationProperties();
+      res.json(properties);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  app.patch("/api/admin/properties/:id/verify", async (req, res) => {
+    try {
+      const { adminId, status, notes } = req.body;
+
+      if (!adminId) {
+        return res.status(401).json({ message: "Admin ID is required" });
+      }
+
+      // Verify admin
+      const admin = await storage.getUser(adminId);
+      if (!admin || admin.role !== "admin") {
+        return res.status(403).json({ message: "Only admins can verify properties" });
+      }
+
+      if (!["verified", "rejected"].includes(status)) {
+        return res.status(400).json({ message: "Invalid verification status" });
+      }
+
+      const property = await storage.verifyProperty(req.params.id, adminId, status, notes);
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      res.json(property);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // Request verification for a property
+  app.post("/api/properties/:id/request-verification", async (req, res) => {
+    try {
+      const { userId } = req.body;
+      const propertyId = req.params.id;
+
+      const property = await storage.getProperty(propertyId);
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+
+      if (property.ownerId !== userId) {
+        return res.status(403).json({ message: "You can only request verification for your own properties" });
+      }
+
+      // Check if at least one document is uploaded
+      const documents = await storage.getPropertyDocuments(propertyId);
+      if (documents.length === 0) {
+        return res.status(400).json({ message: "Please upload at least one document before requesting verification" });
+      }
+
+      const updated = await storage.updateProperty(propertyId, { verificationStatus: "pending" });
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ message: "Server error" });
+    }
+  });
+
+  // S3 configuration check endpoint
+  app.get("/api/config/s3-status", (req, res) => {
+    res.json({ configured: isS3Configured() });
   });
 
   return httpServer;

@@ -6,6 +6,7 @@ import {
   inquiries,
   favorites,
   otpTokens,
+  propertyDocuments,
   type User,
   type InsertUser,
   type Property,
@@ -18,6 +19,8 @@ import {
   type InquiryWithDetails,
   type OtpToken,
   type InsertOtpToken,
+  type PropertyDocument,
+  type InsertPropertyDocument,
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 
@@ -64,12 +67,22 @@ export interface IStorage {
   removeFavorite(userId: string, propertyId: string): Promise<boolean>;
   isFavorite(userId: string, propertyId: string): Promise<boolean>;
 
+  // Property Documents
+  getPropertyDocuments(propertyId: string): Promise<PropertyDocument[]>;
+  addPropertyDocument(document: InsertPropertyDocument): Promise<PropertyDocument>;
+  deletePropertyDocument(id: string): Promise<boolean>;
+
+  // Verification
+  getPendingVerificationProperties(): Promise<Property[]>;
+  verifyProperty(id: string, adminId: string, status: string, notes?: string): Promise<Property | undefined>;
+
   // Stats
   getAdminStats(): Promise<{
     totalProperties: number;
     pendingApprovals: number;
     totalUsers: number;
     activeListings: number;
+    pendingVerifications: number;
   }>;
 }
 
@@ -355,12 +368,56 @@ export class DatabaseStorage implements IStorage {
     return !!favorite;
   }
 
+  // Property Documents
+  async getPropertyDocuments(propertyId: string): Promise<PropertyDocument[]> {
+    return db.select().from(propertyDocuments)
+      .where(eq(propertyDocuments.propertyId, propertyId))
+      .orderBy(desc(propertyDocuments.uploadedAt));
+  }
+
+  async addPropertyDocument(insertDocument: InsertPropertyDocument): Promise<PropertyDocument> {
+    const [document] = await db.insert(propertyDocuments).values({
+      ...insertDocument,
+      id: randomUUID(),
+      uploadedAt: new Date(),
+    }).returning();
+    return document;
+  }
+
+  async deletePropertyDocument(id: string): Promise<boolean> {
+    const result = await db.delete(propertyDocuments)
+      .where(eq(propertyDocuments.id, id))
+      .returning();
+    return result.length > 0;
+  }
+
+  // Verification
+  async getPendingVerificationProperties(): Promise<Property[]> {
+    return db.select().from(properties)
+      .where(eq(properties.verificationStatus, "pending"))
+      .orderBy(desc(properties.createdAt));
+  }
+
+  async verifyProperty(id: string, adminId: string, status: string, notes?: string): Promise<Property | undefined> {
+    const [property] = await db.update(properties)
+      .set({
+        verificationStatus: status,
+        verificationNotes: notes,
+        verifiedAt: status === "verified" ? new Date() : null,
+        verifiedBy: status === "verified" ? adminId : null,
+      })
+      .where(eq(properties.id, id))
+      .returning();
+    return property;
+  }
+
   // Stats
   async getAdminStats(): Promise<{
     totalProperties: number;
     pendingApprovals: number;
     totalUsers: number;
     activeListings: number;
+    pendingVerifications: number;
   }> {
     const allProperties = await db.select().from(properties);
     const allUsers = await db.select().from(users);
@@ -370,6 +427,7 @@ export class DatabaseStorage implements IStorage {
       pendingApprovals: allProperties.filter((p) => p.status === "pending").length,
       totalUsers: allUsers.length,
       activeListings: allProperties.filter((p) => p.status === "approved").length,
+      pendingVerifications: allProperties.filter((p) => p.verificationStatus === "pending").length,
     };
   }
 }

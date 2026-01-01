@@ -45,6 +45,43 @@ export const ListingStatus = {
 
 export type ListingStatusValue = typeof ListingStatus[keyof typeof ListingStatus];
 
+// Verification status
+export const VerificationStatus = {
+  UNVERIFIED: "unverified",
+  PENDING: "pending",
+  VERIFIED: "verified",
+  REJECTED: "rejected",
+} as const;
+
+export type VerificationStatusValue = typeof VerificationStatus[keyof typeof VerificationStatus];
+
+// Document types for sale
+export const SaleDocumentTypes = {
+  SALE_DEED: "sale_deed",
+  TITLE_DEED: "title_deed",
+  ENCUMBRANCE_CERTIFICATE: "encumbrance_certificate",
+  PROPERTY_TAX_RECEIPT: "property_tax_receipt",
+  MUTATION_CERTIFICATE: "mutation_certificate",
+  NOC: "noc",
+  OWNER_ID_PROOF: "owner_id_proof",
+  ALLOTMENT_LETTER: "allotment_letter",
+  POSSESSION_LETTER: "possession_letter",
+  OCCUPANCY_CERTIFICATE: "occupancy_certificate",
+  COMPLETION_CERTIFICATE: "completion_certificate",
+  SOCIETY_SHARE_CERTIFICATE: "society_share_certificate",
+  SURVEY_PLAN: "survey_plan",
+  CONVERSION_CERTIFICATE: "conversion_certificate",
+  PATTA_KHATA: "patta_khata",
+} as const;
+
+// Document types for lease
+export const LeaseDocumentTypes = {
+  OWNERSHIP_PROOF: "ownership_proof",
+  PROPERTY_TAX_RECEIPT: "property_tax_receipt",
+  OWNER_ID_PROOF: "owner_id_proof",
+  NOC_SOCIETY: "noc_society",
+} as const;
+
 // Users table - Updated for OTP auth
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -109,8 +146,32 @@ export const properties = pgTable("properties", {
   ownerType: text("owner_type").notNull(),
   views: integer("views").notNull().default(0),
   isFeatured: boolean("is_featured").notNull().default(false),
+  verificationStatus: text("verification_status").notNull().default("unverified"),
+  verificationNotes: text("verification_notes"),
+  verifiedAt: timestamp("verified_at"),
+  verifiedBy: varchar("verified_by"),
   createdAt: timestamp("created_at").defaultNow(),
 });
+
+// Property Documents table
+export const propertyDocuments = pgTable("property_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  propertyId: varchar("property_id").notNull(),
+  documentType: text("document_type").notNull(),
+  fileName: text("file_name").notNull(),
+  fileUrl: text("file_url").notNull(),
+  fileSize: integer("file_size"),
+  mimeType: text("mime_type"),
+  uploadedAt: timestamp("uploaded_at").defaultNow(),
+});
+
+export const insertPropertyDocumentSchema = createInsertSchema(propertyDocuments).omit({
+  id: true,
+  uploadedAt: true,
+});
+
+export type InsertPropertyDocument = z.infer<typeof insertPropertyDocumentSchema>;
+export type PropertyDocument = typeof propertyDocuments.$inferSelect;
 
 export const insertPropertySchema = createInsertSchema(properties).omit({
   id: true,
